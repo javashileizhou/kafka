@@ -21,12 +21,12 @@ import java.util
 
 import kafka.utils.nonthreadsafe
 
-case class MemberSummary(memberId: String,
-                         groupInstanceId: Option[String],
-                         clientId: String,
-                         clientHost: String,
-                         metadata: Array[Byte],
-                         assignment: Array[Byte])
+case class MemberSummary(memberId: String, // 成员id，由kafka自动生成
+                         groupInstanceId: Option[String], // consumer端参数group.instance.id值
+                         clientId: String, // client.id参数值
+                         clientHost: String, // consumer端程序主机名
+                         metadata: Array[Byte], // 消费者组成员使用的分配策略
+                         assignment: Array[Byte]) // 成员订阅分区
 
 private object MemberMetadata {
   def plainProtocolSet(supportedProtocols: List[(String, Array[Byte])]) = supportedProtocols.map(_._1).toSet
@@ -58,15 +58,19 @@ private[group] class MemberMetadata(var memberId: String,
                                     val groupInstanceId: Option[String],
                                     val clientId: String,
                                     val clientHost: String,
-                                    val rebalanceTimeoutMs: Int,
-                                    val sessionTimeoutMs: Int,
-                                    val protocolType: String,
+                                    val rebalanceTimeoutMs: Int, //rebalane操作超时时间
+                                    val sessionTimeoutMs: Int, // 会话超时时间
+                                    val protocolType: String, //对消费者而言是consumer
                                     var supportedProtocols: List[(String, Array[Byte])]) {
-
+  // 保存分配给该成员的分区分配方案
   var assignment: Array[Byte] = Array.empty[Byte]
+  // 表示组成员是否在等待加入组
   var awaitingJoinCallback: JoinGroupResult => Unit = null
+  // 表示组成员是否正在等待GroupCoordinator发送分配方案
   var awaitingSyncCallback: SyncGroupResult => Unit = null
+  // 表示组成员是否发起"退出组"操作
   var isLeaving: Boolean = false
+  // 表示是否是消费者组下的新成员
   var isNew: Boolean = false
   val isStaticMember: Boolean = groupInstanceId.isDefined
 
@@ -84,6 +88,7 @@ private[group] class MemberMetadata(var memberId: String,
    * Get metadata corresponding to the provided protocol.
    */
   def metadata(protocol: String): Array[Byte] = {
+    // 从配置的分区分配策略中寻找给定的策略
     supportedProtocols.find(_._1 == protocol) match {
       case Some((_, metadata)) => metadata
       case None =>

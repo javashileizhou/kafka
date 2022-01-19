@@ -108,18 +108,24 @@ abstract class AbstractIndex(@volatile var file: File, val baseOffset: Long, val
 
   @volatile
   protected var mmap: MappedByteBuffer = {
+    // 第1步:创建索引文件
     val newlyCreated = file.createNewFile()
+    // 第2步:以writable指定的方式(读写方式或只读方式)打开索引文件
     val raf = if (writable) new RandomAccessFile(file, "rw") else new RandomAccessFile(file, "r")
     try {
       /* pre-allocate the file if necessary */
       if(newlyCreated) {
         if(maxIndexSize < entrySize)
           throw new IllegalArgumentException("Invalid max index size: " + maxIndexSize)
+        // 第3步:设置索引文件长度，roundDownToExactMultiple计算的是不超过maxIndexSize的文件长度
+        // 比如maxIndexSize=1234567，entrySize=8，那么调整后的文件长度为1234560
         raf.setLength(roundDownToExactMultiple(maxIndexSize, entrySize))
       }
 
       /* memory-map the file */
+      // 第4步:更新索引长度字段_length
       _length = raf.length()
+      // 第5步:创建MappedByteBuffer对象
       val idx = {
         if (writable)
           raf.getChannel.map(FileChannel.MapMode.READ_WRITE, 0, _length)
@@ -127,11 +133,13 @@ abstract class AbstractIndex(@volatile var file: File, val baseOffset: Long, val
           raf.getChannel.map(FileChannel.MapMode.READ_ONLY, 0, _length)
       }
       /* set the position in the index for the next entry */
+      // 第6步:如果是新创建的索引文件，将MappedByteBuffer对象的当前位置置成0
       if(newlyCreated)
         idx.position(0)
       else
         // if this is a pre-existing index, assume it is valid and set position to last entry
         idx.position(roundDownToExactMultiple(idx.limit(), entrySize))
+      // 第7步:返回创建的MappedByteBuffer对象
       idx
     } finally {
       CoreUtils.swallow(raf.close(), AbstractIndex)
@@ -370,6 +378,7 @@ abstract class AbstractIndex(@volatile var file: File, val baseOffset: Long, val
     if(_entries == 0)
       return (-1, -1)
 
+    // 封装原版的二分查找算法
     def binarySearch(begin: Int, end: Int) : (Int, Int) = {
       // binary search for the entry
       var lo = begin

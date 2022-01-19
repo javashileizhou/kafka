@@ -33,13 +33,13 @@ import org.apache.kafka.server.authorizer.AuthorizableRequestContext;
 import static org.apache.kafka.common.protocol.ApiKeys.API_VERSIONS;
 
 public class RequestContext implements AuthorizableRequestContext {
-    public final RequestHeader header;
-    public final String connectionId;
-    public final InetAddress clientAddress;
-    public final KafkaPrincipal principal;
-    public final ListenerName listenerName;
-    public final SecurityProtocol securityProtocol;
-    public final ClientInformation clientInformation;
+    public final RequestHeader header; // Request头部数据，主要是一些对用户不可见的元数据
+    public final String connectionId; // Request发送方的TCP连接串标识
+    public final InetAddress clientAddress;  // Request发送方IP地址
+    public final KafkaPrincipal principal; // Kafka用户认证类，用于认证授权
+    public final ListenerName listenerName; // 监听器名称，
+    public final SecurityProtocol securityProtocol; // 安全协议类型
+    public final ClientInformation clientInformation; // 用户自定义的一些连接方信息
 
     public RequestContext(RequestHeader header,
                           String connectionId,

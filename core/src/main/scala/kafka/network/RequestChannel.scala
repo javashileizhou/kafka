@@ -74,12 +74,13 @@ object RequestChannel extends Logging {
     }
   }
 
-  class Request(val processor: Int,
-                val context: RequestContext,
-                val startTimeNanos: Long,
-                memoryPool: MemoryPool,
-                @volatile private var buffer: ByteBuffer,
-                metrics: RequestChannel.Metrics) extends BaseRequest {
+  class Request(val processor: Int, // processor 是 Processor 线程的序号，即这个请求是由哪个 Processor 线程接收处理的。
+                val context: RequestContext, // 是用来标识请求上下文信息的
+                val startTimeNanos: Long, // Request 对象被创建的时间，主要用于各种时间统计指标的计 算。
+                memoryPool: MemoryPool, // 源码定义的一个非阻塞式的内存缓冲区，主要作用是避免 Request 对 象无限使用内存。
+                @volatile private var buffer: ByteBuffer, // buffer 是真正保存 Request 对象内容的字节缓冲区。R
+                metrics: RequestChannel.Metrics // 各种监控指标的一个管理类
+               ) extends BaseRequest {
     // These need to be volatile because the readers are in the network thread and the writers are in the request
     // handler threads or the purgatory threads
     @volatile var requestDequeueTimeNanos = -1L

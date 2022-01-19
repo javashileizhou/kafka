@@ -135,16 +135,18 @@ class GroupCoordinator(val brokerId: Int,
                       protocolType: String,
                       protocols: List[(String, Array[Byte])],
                       responseCallback: JoinCallback): Unit = {
+    // 验证消费者组状态的合法性
     validateGroupStatus(groupId, ApiKeys.JOIN_GROUP).foreach { error =>
       responseCallback(JoinGroupResult(memberId, error))
       return
     }
-
+    // 确保sessionTimeoutMs参数正常
     if (sessionTimeoutMs < groupConfig.groupMinSessionTimeoutMs ||
       sessionTimeoutMs > groupConfig.groupMaxSessionTimeoutMs) {
       responseCallback(JoinGroupResult(memberId, Errors.INVALID_SESSION_TIMEOUT))
     } else {
       val isUnknownMember = memberId == JoinGroupRequest.UNKNOWN_MEMBER_ID
+      // 获取消费者组信息，如果组不存在，就创建一个新的消费者组
       groupManager.getGroup(groupId) match {
         case None =>
           // only try to create the group if the group is UNKNOWN AND
@@ -199,6 +201,7 @@ class GroupCoordinator(val brokerId: Int,
       } else if (!group.supportsProtocols(protocolType, MemberMetadata.plainProtocolSet(protocols))) {
         responseCallback(JoinGroupResult(JoinGroupRequest.UNKNOWN_MEMBER_ID, Errors.INCONSISTENT_GROUP_PROTOCOL))
       } else {
+        // 根据规则为该成员创建成员id
         val newMemberId = group.generateMemberId(clientId, groupInstanceId)
 
         if (group.hasStaticMember(groupInstanceId)) {
@@ -262,6 +265,7 @@ class GroupCoordinator(val brokerId: Int,
             // it reset its member id and retry.
           responseCallback(JoinGroupResult(memberId, Errors.UNKNOWN_MEMBER_ID))
         } else {
+          // 获取该成员的元数据信息
           val member = group.get(memberId)
 
           group.currentState match {

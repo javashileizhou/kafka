@@ -33,7 +33,7 @@ import scala.collection.JavaConverters._
 /**
  * A thread that answers kafka requests.
  */
-class KafkaRequestHandler(id: Int,
+class KafkaRequestHandler(id: Int, // I/O线程序号
                           brokerId: Int,
                           val aggregateIdleMeter: Meter,
                           val totalHandlerThreads: AtomicInteger,

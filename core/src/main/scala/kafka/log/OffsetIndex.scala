@@ -140,6 +140,7 @@ class OffsetIndex(_file: File, baseOffset: Long, maxIndexSize: Int = -1, writabl
    */
   def append(offset: Long, position: Int): Unit = {
     inLock(lock) {
+      // 第1步:判断索引文件未写满
       require(!isFull, "Attempt to append to a full index (size = " + _entries + ").")
       if (_entries == 0 || offset > _lastOffset) {
         trace(s"Adding index entry $offset => $position to ${file.getAbsolutePath}")

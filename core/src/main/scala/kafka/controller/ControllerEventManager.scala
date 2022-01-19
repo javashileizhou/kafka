@@ -43,15 +43,16 @@ trait ControllerEventProcessor {
 class QueuedEvent(val event: ControllerEvent,
                   val enqueueTimeMs: Long) {
   val processingStarted = new CountDownLatch(1)
+  // 标识事件是否被处理过
   val spent = new AtomicBoolean(false)
-
+  // 接收一个Controller事件，并进行处理
   def process(processor: ControllerEventProcessor): Unit = {
     if (spent.getAndSet(true))
       return
     processingStarted.countDown()
     processor.process(event)
   }
-
+  // 接收一个Controller事件，并抢占队列之前的事件进行优先处理
   def preempt(processor: ControllerEventProcessor): Unit = {
     if (spent.getAndSet(true))
       return
@@ -118,15 +119,16 @@ class ControllerEventManager(controllerId: Int,
     override def doWork(): Unit = {
       val dequeued = queue.take()
       dequeued.event match {
+        // 如果是关闭线程事件，什么都不用做。关闭线程由外部来执行
         case ShutdownEventThread => // The shutting down of the thread has been initiated at this point. Ignore this event.
         case controllerEvent =>
           _state = controllerEvent.state
-
+          // 更新对应事件在队列中保存的时间
           eventQueueTimeHist.update(time.milliseconds() - dequeued.enqueueTimeMs)
 
           try {
             def process(): Unit = dequeued.process(processor)
-
+            // 处理事件，同时计算处理速率
             rateAndTimeMetrics.get(state) match {
               case Some(timer) => timer.time { process() }
               case None => process()

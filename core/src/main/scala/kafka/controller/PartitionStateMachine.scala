@@ -150,15 +150,19 @@ class ZkPartitionStateMachine(config: KafkaConfig,
   ): Map[TopicPartition, Either[Throwable, LeaderAndIsr]] = {
     if (partitions.nonEmpty) {
       try {
+        // 清空Controller待发送请求集合
         controllerBrokerRequestBatch.newBatch()
+        // 执行真正的状态变更逻辑
         val result = doHandleStateChanges(
           partitions,
           targetState,
           partitionLeaderElectionStrategyOpt
         )
+        // 发送对应的Controller请求给Broker
         controllerBrokerRequestBatch.sendRequestsToBrokers(controllerContext.epoch)
         result
       } catch {
+            // 如果Controller易主，则记录错误日志
         case e: ControllerMovedException =>
           error(s"Controller moved to another broker when moving some partitions to $targetState state", e)
           throw e
@@ -206,6 +210,7 @@ class ZkPartitionStateMachine(config: KafkaConfig,
     partitionLeaderElectionStrategyOpt: Option[PartitionLeaderElectionStrategy]
   ): Map[TopicPartition, Either[Throwable, LeaderAndIsr]] = {
     val stateChangeLog = stateChangeLogger.withControllerEpoch(controllerContext.epoch)
+    // 初始化新分区的状态为NonExistentPartition
     partitions.foreach(partition => controllerContext.putPartitionStateIfNotExists(partition, NonExistentPartition))
     val (validPartitions, invalidPartitions) = controllerContext.checkValidPartitionStateChange(partitions, targetState)
     invalidPartitions.foreach(partition => logInvalidTransition(partition, targetState))
@@ -219,8 +224,11 @@ class ZkPartitionStateMachine(config: KafkaConfig,
         }
         Map.empty
       case OnlinePartition =>
+        // 获取未初始化分区列表，也就是NewPartition状态下的所有分区
         val uninitializedPartitions = validPartitions.filter(partition => partitionState(partition) == NewPartition)
+        // 获取具备Leader选举资格的分区列表
         val partitionsToElectLeader = validPartitions.filter(partition => partitionState(partition) == OfflinePartition || partitionState(partition) == OnlinePartition)
+        // 初始化NewPartition状态分区，在Zookeeper中写入Leader和ISR数据
         if (uninitializedPartitions.nonEmpty) {
           val successfulInitializations = initializeLeaderAndIsrForPartitions(uninitializedPartitions)
           successfulInitializations.foreach { partition =>
@@ -229,6 +237,7 @@ class ZkPartitionStateMachine(config: KafkaConfig,
             controllerContext.putPartitionState(partition, OnlinePartition)
           }
         }
+        // 为具备Leader选举资格的分区推选Leader
         if (partitionsToElectLeader.nonEmpty) {
           val electionResults = electLeaderForPartitions(
             partitionsToElectLeader,
@@ -516,9 +525,15 @@ class ZkPartitionStateMachine(config: KafkaConfig,
 }
 
 object PartitionLeaderElectionAlgorithms {
-  def offlinePartitionLeaderElection(assignment: Seq[Int], isr: Seq[Int], liveReplicas: Set[Int], uncleanLeaderElectionEnabled: Boolean, controllerContext: ControllerContext): Option[Int] = {
+  def offlinePartitionLeaderElection(assignment: Seq[Int], // 分区的副本列表
+                                     isr: Seq[Int], // 分区所有与Leader副本保持同步的副本列表
+                                     liveReplicas: Set[Int], // 分区下所有处于存活状态的副本
+                                     uncleanLeaderElectionEnabled: Boolean, controllerContext: ControllerContext): Option[Int] = {
+    // 从当前分区副本列表中寻找首个处于存活状态的ISR副本
     assignment.find(id => liveReplicas.contains(id) && isr.contains(id)).orElse {
+      // 如果找不到满足条件的副本，查看是否允许Unclean Leader选举
       if (uncleanLeaderElectionEnabled) {
+        // 选择当前副本列表中的第一个存活副本作为Leader
         val leaderOpt = assignment.find(liveReplicas.contains)
         if (leaderOpt.isDefined)
           controllerContext.stats.uncleanLeaderElectionRate.mark()

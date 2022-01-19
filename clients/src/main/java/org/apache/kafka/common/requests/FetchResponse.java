@@ -269,13 +269,13 @@ public class FetchResponse<T extends BaseRecords> extends AbstractResponse {
     }
 
     public static final class PartitionData<T extends BaseRecords> {
-        public final Errors error;
-        public final long highWatermark;
-        public final long lastStableOffset;
-        public final long logStartOffset;
-        public final Optional<Integer> preferredReadReplica;
-        public final List<AbortedTransaction> abortedTransactions;
-        public final T records;
+        public final Errors error;  //错误码
+        public final long highWatermark; // 高水位值
+        public final long lastStableOffset; // 最新lso值
+        public final long logStartOffset; // 最新 Log Start Offset值
+        public final Optional<Integer> preferredReadReplica; // 期望的Read Replica
+        public final List<AbortedTransaction> abortedTransactions; // 该分区对应的已终止事物列表
+        public final T records; // 消息集合
 
         public PartitionData(Errors error,
                              long highWatermark,
